@@ -8,7 +8,7 @@ import torch.optim as optim
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-
+import pickle
 
 cuda = torch.cuda.is_available()
 kwargs = {'num_workers': 1, 'pin_memory': True} if cuda else {}
@@ -143,8 +143,6 @@ for epoch in range(10):
         G_loss = -torch.mean(torch.log(D_fake_gauss + TINY))
         G_loss.backward()
         Q_generator.step()
-        if i >= 1000:
-            break
 
         progress.set_description("E: {} L: {}".format(epoch, total_loss/(i+1)))
 
@@ -159,7 +157,12 @@ for epoch in range(10):
         plt.savefig("{}reconstruction{}.png".format(epoch, i))
         plt.close()
 
-
+with open("encoder.pkl", "wb") as of:
+    pickle.dump(P, of)
+with open("decoder.pkl", "wb") as of:
+    pickle.dump(Q, of)
+with open("critic.pkl", "wb") as of:
+    pickle.dump(D_gauss, of)
 
 
 
