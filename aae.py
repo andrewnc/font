@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 
 cuda = torch.cuda.is_available()
@@ -101,47 +102,62 @@ D_gauss_solver = optim.Adam(D_gauss.parameters(), lr=reg_lr)
 
 TINY = 1e-15
 
-progress = tqdm(enumerate(train_loader))
-total_loss = 0
-for i, (X, target) in progress: 
-    X = X.cuda()
-    X = X.view(batch_size, X_dim)
+for epoch in range(10):
+    total_loss = 0
+    progress = tqdm(enumerate(train_loader))
+    for i, (X, target) in progress: 
+        X = X.cuda()
+        X = X.view(batch_size, X_dim)
 
-    #init gradients
-    P.zero_grad()
-    Q.zero_grad()
-    D_gauss.zero_grad()
+        #init gradients
+        P.zero_grad()
+        Q.zero_grad()
+        D_gauss.zero_grad()
 
-    
-    z_sample = Q(X)
-    X_sample = P(z_sample)
-    recon_loss = F.binary_cross_entropy(X_sample + TINY, X + TINY)
-    recon_loss.backward()
-    P_decoder.step()
-    Q_encoder.step()
-    
-    Q.eval()    
-    z_real_gauss = Variable(torch.randn(batch_size, z_dim) * 5)   # Sample from N(0,5)
-    if torch.cuda.is_available():
-        z_real_gauss = z_real_gauss.cuda()
-    z_fake_gauss = Q(X)
-    
-    # Compute discriminator outputs and loss
-    D_real_gauss, D_fake_gauss = D_gauss(z_real_gauss), D_gauss(z_fake_gauss)
-    D_loss_gauss = -torch.mean(torch.log(D_real_gauss + TINY) + torch.log(1 - D_fake_gauss + TINY))
-    D_loss_gauss.backward()       # Backpropagate loss
-    D_gauss_solver.step()   # Apply optimization step
-    
-    total_loss += D_loss_gauss.item()
-    # Generator
-    Q.train()   # Back to use dropout
-    z_fake_gauss = Q(X)
-    D_fake_gauss = D_gauss(z_fake_gauss)
-    
-    G_loss = -torch.mean(torch.log(D_fake_gauss + TINY))
-    G_loss.backward()
-    Q_generator.step()
-    progress.set_description("{}".format(total_loss/(i+1)))
+        
+        z_sample = Q(X)
+        X_sample = P(z_sample)
+        recon_loss = F.binary_cross_entropy(X_sample + TINY, X + TINY)
+        recon_loss.backward()
+        P_decoder.step()
+        Q_encoder.step()
+        
+        Q.eval()    
+        z_real_gauss = Variable(torch.randn(batch_size, z_dim) * 5)   # Sample from N(0,5)
+        if torch.cuda.is_available():
+            z_real_gauss = z_real_gauss.cuda()
+        z_fake_gauss = Q(X)
+        
+        # Compute discriminator outputs and loss
+        D_real_gauss, D_fake_gauss = D_gauss(z_real_gauss), D_gauss(z_fake_gauss)
+        D_loss_gauss = -torch.mean(torch.log(D_real_gauss + TINY) + torch.log(1 - D_fake_gauss + TINY))
+        D_loss_gauss.backward()       # Backpropagate loss
+        D_gauss_solver.step()   # Apply optimization step
+        
+        total_loss += D_loss_gauss.item()
+        # Generator
+        Q.train()   # Back to use dropout
+        z_fake_gauss = Q(X)
+        D_fake_gauss = D_gauss(z_fake_gauss)
+        
+        G_loss = -torch.mean(torch.log(D_fake_gauss + TINY))
+        G_loss.backward()
+        Q_generator.step()
+        if i >= 1000:
+            break
+
+        progress.set_description("E: {} L: {}".format(epoch, total_loss/(i+1)))
+
+    for i in range(10):
+        fig, ax = plt.subplots(ncols=4, nrows=1, squeeze=False)
+        z_real_gauss = Variable(torch.randn(batch_size, z_dim) * 5).cuda()   # Sample from N(0,5)
+        sampled_x = P(z_real_gauss).cpu().detach().view(batch_size, 28,28)
+        ax[0][0].imshow(sampled_x[0], cmap='gray')
+        ax[0][1].imshow(sampled_x[1], cmap='gray')
+        ax[0][2].imshow(sampled_x[2], cmap='gray')
+        ax[0][3].imshow(sampled_x[3], cmap='gray')
+        plt.savefig("{}reconstruction{}.png".format(epoch, i))
+        plt.close()
 
 
 
