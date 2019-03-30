@@ -1,11 +1,14 @@
+import cv2
+import random
 import torch
-import torch.utils.data
+from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
+import os
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import pickle
@@ -68,8 +71,46 @@ class D_net_gauss(nn.Module):
 
 
 # read in data
+class FontDataset(Dataset):
+    def __init__(self, path='../dataset'):
+        super(FontDataset, self).__init__()
+        self._characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890'
+        self._eye = np.eye(len(self._characters), dtype=np.float32)
+        self._data = []
+        self._trsfm = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,))
+        ])
+        print("Loading Data")
 
-train_loader = torch.utils.data.DataLoader(
+        for directory in tqdm(os.listdir(path)):
+            font_path = os.path.join(path, directory)
+            images = []
+
+            for i, char in enumerate(self._characters):
+                img_path = os.path.join(font_path, char + '.png')
+                if os.path.exists(img_path):
+                    img = cv2.imread(img_path)
+                    img = np.min(img, axis=2, keepdims=True)
+                    img = self._trsfm(img)
+                    images.append((cv2.imread(img_path), self._eye[i]))
+
+            self._data.append(images)
+
+
+    def __getitem__(self, idx):
+        font = self_data[idx]
+        char1 = random.choice(font)
+        char2 = random.choice(font)
+        return char1[0], char2[0], char2[1]  # input image, recration image, recreation class
+
+
+    def __len__(self):
+        return len(self._data)
+
+
+# font_dataset = FontDataset()
+train_loader = DataLoader(
         datasets.MNIST('../data', train=True, download=True,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
